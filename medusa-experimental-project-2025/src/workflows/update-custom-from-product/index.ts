@@ -26,6 +26,33 @@ export const UpdateCustomFromProductWorkflow = createWorkflow(
             }
         })
 
+        const created = when(
+            'created-product-custom-link',
+            {
+                input,
+                products,
+            }, (data) => 
+                !data.products[0].custom &&
+                (
+                    (typeof data.input.additional_data?.brand === 'string' && data.input.additional_data?.brand.length > 0) ||
+                    typeof data.input.additional_data?.is_featured === 'boolean'
+                )
+        )
+        .then(() => {
+            const custom = createCustomStep({
+                brand: typeof input.additional_data?.brand === 'string' ? input.additional_data?.brand : undefined,
+                is_featured: input.additional_data?.is_featured,
+            })
+
+            createRemoteLinkStep([{
+                [Modules.PRODUCT]: {
+                    custom_id: custom.id,
+                }
+            }])
+
+            return custom
+        })
+
         // TODO create, update or delete Custom record
     }
 )
