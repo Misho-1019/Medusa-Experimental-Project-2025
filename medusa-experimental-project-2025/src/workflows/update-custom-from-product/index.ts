@@ -1,6 +1,6 @@
 import { ProductDTO } from "@medusajs/framework/types";
 import { createWorkflow, when, WorkflowResponse } from "@medusajs/framework/workflows-sdk";
-import { createRemoteLinkStep, dismissRemoteLinkStep, useQueryGraphStep } from "@medusajs/medusa/core-flows";
+import { createRemoteLinkStep, DeleteCustomersStepInput, dismissRemoteLinkStep, useQueryGraphStep } from "@medusajs/medusa/core-flows";
 import { createCustomStep } from "../create-custom-from-product/steps/create-custom";
 import { Modules } from "@medusajs/framework/utils";
 import { CUSTOM_MODULE } from "../../modules/custom";
@@ -53,6 +53,44 @@ export const UpdateCustomFromProductWorkflow = createWorkflow(
             return custom
         })
 
-        // TODO create, update or delete Custom record
+        const deleted = when(
+            'delete-product-custom-link',
+            {
+                input,
+                products,
+            }, (data) => 
+                !!data.products[0]?.custom && (
+                    (
+                        typeof data.input.additional_data?.brand !== 'string' ||
+                        data.input.additional_data.brand.length === 0
+                    ) &&
+                    typeof data.input.additional_data?.is_featured !== "boolean"
+                )
+        )
+        .then(() => {
+            const custom = products[0]?.custom
+            if (!custom) return
+
+            const normalizedCustom = {
+                ...custom,
+                created_at: new Date(custom.created_at),
+                updated_at: new Date(custom.updated_at),
+                deleted_at: custom.deleted_at ? new Date(custom.deleted_at) : null,
+            }
+
+            deleteCustomStep({
+                custom: normalizedCustom
+            })
+
+            dismissRemoteLinkStep({
+                [CUSTOM_MODULE]: {
+                    custom_id: custom.id,
+                }
+            })
+
+            return custom.id
+        })
+
+        // TODO update or delete Custom record
     }
 )
