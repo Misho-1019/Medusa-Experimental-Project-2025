@@ -31,66 +31,85 @@ export const UpdateCustomFromProductWorkflow = createWorkflow(
             {
                 input,
                 products,
-            }, (data) => 
-                !data.products[0].custom &&
-                (
-                    (typeof data.input.additional_data?.brand === 'string' && data.input.additional_data?.brand.length > 0) ||
-                    typeof data.input.additional_data?.is_featured === 'boolean'
-                )
+            }, (data) =>
+            !data.products[0].custom &&
+            (
+                (typeof data.input.additional_data?.brand === 'string' && data.input.additional_data?.brand.length > 0) ||
+                typeof data.input.additional_data?.is_featured === 'boolean'
+            )
         )
-        .then(() => {
-            const custom = createCustomStep({
-                brand: typeof input.additional_data?.brand === 'string' ? input.additional_data?.brand : undefined,
-                is_featured: input.additional_data?.is_featured,
+            .then(() => {
+                const custom = createCustomStep({
+                    brand: typeof input.additional_data?.brand === 'string' ? input.additional_data?.brand : undefined,
+                    is_featured: input.additional_data?.is_featured,
+                })
+
+                createRemoteLinkStep([{
+                    [Modules.PRODUCT]: {
+                        custom_id: custom.id,
+                    }
+                }])
+
+                return custom
             })
-
-            createRemoteLinkStep([{
-                [Modules.PRODUCT]: {
-                    custom_id: custom.id,
-                }
-            }])
-
-            return custom
-        })
 
         const deleted = when(
             'delete-product-custom-link',
             {
                 input,
                 products,
-            }, (data) => 
-                !!data.products[0]?.custom && (
-                    (
-                        typeof data.input.additional_data?.brand !== 'string' ||
-                        data.input.additional_data.brand.length === 0
-                    ) &&
-                    typeof data.input.additional_data?.is_featured !== "boolean"
-                )
+            }, (data) =>
+            !!data.products[0]?.custom && (
+                (
+                    typeof data.input.additional_data?.brand !== 'string' ||
+                    data.input.additional_data.brand.length === 0
+                ) &&
+                typeof data.input.additional_data?.is_featured !== "boolean"
+            )
         )
-        .then(() => {
-            const custom = products[0]?.custom
-            if (!custom) return
+            .then(() => {
+                const custom = products[0]?.custom
+                if (!custom) return
 
-            const normalizedCustom = {
-                ...custom,
-                created_at: new Date(custom.created_at),
-                updated_at: new Date(custom.updated_at),
-                deleted_at: custom.deleted_at ? new Date(custom.deleted_at) : null,
-            }
-
-            deleteCustomStep({
-                custom: normalizedCustom
-            })
-
-            dismissRemoteLinkStep({
-                [CUSTOM_MODULE]: {
-                    custom_id: custom.id,
+                const normalizedCustom = {
+                    ...custom,
+                    created_at: new Date(custom.created_at),
+                    updated_at: new Date(custom.updated_at),
+                    deleted_at: custom.deleted_at ? new Date(custom.deleted_at) : null,
                 }
+
+                deleteCustomStep({
+                    custom: normalizedCustom
+                })
+
+                dismissRemoteLinkStep({
+                    [CUSTOM_MODULE]: {
+                        custom_id: custom.id,
+                    }
+                })
+
+                return custom.id
             })
 
-            return custom.id
+        const updated = when({
+            input,
+            products,
+        }, (data) => !!data.products[0].custom && (
+            (typeof data.input.additional_data?.brand === 'string' && data.input.additional_data?.brand.length > 0) ||
+            typeof data.input.additional_data?.is_featured === 'boolean'
+        ))
+        .then(() => {
+            return updateCustomStep({
+                id: products[0].custom!.id,
+                brand: typeof input.additional_data?.brand === 'string' ? input.additional_data.brand : undefined,
+                is_featured: input.additional_data?.is_featured
+            })
         })
 
-        // TODO update or delete Custom record
+        return new WorkflowResponse({
+            created,
+            updated,
+            deleted,
+        })
     }
 )
